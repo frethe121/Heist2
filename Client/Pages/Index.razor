@@ -1,7 +1,57 @@
 ﻿@page "/"
+@using Heist.Models
+@inject NavigationManager Navigation
+@using System.Net.Http.Json
 
-<PageTitle>Index</PageTitle>
+<h3>Select an option</h3>
 
-<h1>Hello, world!</h1>
+@if (options is null)
+{
+  <p>Loading...</p>
+}
+else
+{
+  <div class="options">
+    @foreach (var opt in options)
+    {
+      <button class="option"
+              @onclick="() => SelectOption(opt.Color)"
+              style="background-color:@opt.Color; color:@(opt.Color == "black" ? "white" : "black")">
+        Option @opt.Id (@opt.Color)
+      </button>
+    }
+  </div>
 
-Welcome to your new app.
+  @if (!string.IsNullOrEmpty(statusMessage))
+  {
+    <p>@statusMessage</p>
+  }
+}
+
+@code {
+  private List<Option>? options;
+  private string? statusMessage;
+
+  protected override async Task OnInitializedAsync()
+  {
+    var client = new HttpClient { BaseAddress = new Uri(Navigation.BaseUri) };
+    options = await client.GetFromJsonAsync<List<Option>>("/api/options");
+  }
+
+  private async Task SelectOption(string color)
+  {
+    var client = new HttpClient { BaseAddress = new Uri(Navigation.BaseUri) };
+    var resp = await client.PostAsJsonAsync("/api/selection", new { color });
+    if (resp.IsSuccessStatusCode)
+    {
+      statusMessage = $"Selection sent: {color}";
+      // refresh options to show new random colors (optional)
+      options = await client.GetFromJsonAsync<List<Option>>("/api/options");
+      StateHasChanged();
+    }
+    else
+    {
+      statusMessage = $"Failed to send selection: {resp.StatusCode}";
+    }
+  }
+}
